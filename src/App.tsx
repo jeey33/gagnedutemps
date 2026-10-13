@@ -142,7 +142,7 @@ export default function App() {
   };
   const deleteReward = async (id: string) => {
     setRewards(rewards.filter(r => r.id !== id));
-    await fetch(`${SUPABASE_URL}/rewards?id=eq.${r.id}`, { method: 'DELETE', headers });
+    await fetch(`${SUPABASE_URL}/rewards?id=eq.${id}`, { method: 'DELETE', headers });
   };
 
   return (
