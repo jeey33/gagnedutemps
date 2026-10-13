@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 interface Child { id: string; name: string; points: number; }
-interface Item { id: string; title: string; value: number; icon: string; }
+interface Item { id: string; title: string; value: number; icon: string; is_bonus?: boolean; }
 
 // === CONFIGURATION SUPABASE ===
 const SUPABASE_URL = 'https://nzoysgkqelpayfxwbmbd.supabase.co/rest/v1';
-const SUPABASE_KEY = 'sb_publishable_cS53pYq9msZ6FxVcUIuGdA_B5AEud7n'; // <-- REMETTEZ VOTRE CLÉ ICI !
+const SUPABASE_KEY = 'VOTRE_CLE_SECRETE_ICI'; // <-- REMETTEZ VOTRE CLÉ ICI !
 
 const headers = {
   'apikey': SUPABASE_KEY,
@@ -20,7 +20,6 @@ export default function App() {
   const [rewards, setRewards] = useState<Item[]>([]);
   const [isAdminMode, setIsAdminMode] = useState(false);
 
-  // 1. CHARGEMENT DES DONNÉES
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -39,7 +38,6 @@ export default function App() {
     fetchData();
   }, []);
 
-  // 2. MODIFICATION DES POINTS
   const updatePoints = async (childId: string, newPoints: number) => {
     setChildren(children.map(c => c.id === childId ? { ...c, points: newPoints } : c));
     await fetch(`${SUPABASE_URL}/children?id=eq.${childId}`, {
@@ -57,7 +55,7 @@ export default function App() {
   const removePoints = (childId: string) => {
     const child = children.find(c => c.id === childId);
     if (child) {
-      const penalty = prompt(`Combien de points voulez-vous retirer à ${child.name} pour cette erreur ? (ex: 5)`);
+      const penalty = prompt(`Combien de points retirer à ${child.name} pour cette erreur ? (ex: 5)`);
       if (penalty && !isNaN(parseInt(penalty))) {
         updatePoints(childId, child.points - parseInt(penalty));
       }
@@ -75,7 +73,6 @@ export default function App() {
     }
   };
 
-  // 3. SÉCURITÉ PARENT
   const toggleAdminMode = () => {
     if (!isAdminMode) {
       const password = prompt("Mot de passe Parent :");
@@ -86,7 +83,6 @@ export default function App() {
     }
   };
 
-  // 4. MODE PARENT : AJOUTS FACILES AVEC FORMULAIRES
   const addChild = async () => {
     const name = prompt("Nom de l'enfant :");
     if (!name) return;
@@ -98,11 +94,13 @@ export default function App() {
   const addTask = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const isBonus = formData.get('is_bonus') === 'on';
     const newItem = {
       id: Date.now().toString(),
       icon: formData.get('icon') as string,
       title: formData.get('title') as string,
-      value: parseInt(formData.get('value') as string)
+      value: parseInt(formData.get('value') as string),
+      is_bonus: isBonus
     };
     setTasks([...tasks, newItem]);
     await fetch(`${SUPABASE_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(newItem) });
@@ -150,7 +148,6 @@ export default function App() {
         <div style={{ background: '#f9f9f9', padding: '20px', borderRadius: '8px' }}>
           <h2>Configuration (Protégée)</h2>
           
-          {/* GESTION DES ENFANTS */}
           <div style={{ marginBottom: '30px' }}>
             <h3>👶 Enfants <button onClick={addChild} style={{ padding: '5px' }}>+ Ajouter</button></h3>
             {children.map(c => (
@@ -161,24 +158,25 @@ export default function App() {
             ))}
           </div>
 
-          {/* GESTION DES TÂCHES */}
           <div style={{ marginBottom: '30px' }}>
-            <h3>✅ Tâches (Actions positives)</h3>
-            <form onSubmit={addTask} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+            <h3>✅ Tâches & Bonus</h3>
+            <form onSubmit={addTask} style={{ display: 'flex', gap: '5px', marginBottom: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
               <input name="icon" placeholder="Emoji 🧹" required style={{ width: '60px', padding: '5px' }} />
-              <input name="title" placeholder="Nom de la tâche" required style={{ flex: 1, padding: '5px' }} />
+              <input name="title" placeholder="Nom de la tâche" required style={{ flex: 1, minWidth: '150px', padding: '5px' }} />
               <input name="value" type="number" placeholder="Points" required style={{ width: '70px', padding: '5px' }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', background: '#ffe4b5', padding: '4px 8px', borderRadius: '4px' }}>
+                <input type="checkbox" name="is_bonus" /> ⭐ Bonus
+              </label>
               <button type="submit" style={{ padding: '5px 10px', background: '#2e8b57', color: 'white', border: 'none', borderRadius: '4px' }}>Ajouter</button>
             </form>
             {tasks.map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #ddd' }}>
-                <span>{t.icon} {t.title} (+{t.value})</span>
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #ddd', background: t.is_bonus ? '#fffacd' : 'transparent' }}>
+                <span>{t.icon} {t.title} (+{t.value}) {t.is_bonus && '⭐'}</span>
                 <button onClick={() => deleteTask(t.id)}>❌</button>
               </div>
             ))}
           </div>
 
-          {/* GESTION DES RÉCOMPENSES */}
           <div>
             <h3>🎁 Récompenses</h3>
             <form onSubmit={addReward} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
@@ -197,49 +195,55 @@ export default function App() {
         </div>
       ) : 
       
-      /* === ÉCRAN SCINDÉ EN 2 COLONNES POUR LES ENFANTS === */
       (
         <div>
           <h1 style={{ textAlign: 'center', marginBottom: '20px' }}>🏆 Les Scores</h1>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {children.map(child => (
-              <div key={child.id} style={{ background: '#f0f8ff', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              <div key={child.id} style={{ background: '#f0f8ff', padding: '10px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                 
-                {/* En-tête de l'enfant */}
                 <div style={{ textAlign: 'center', marginBottom: '15px', background: '#fff', padding: '10px', borderRadius: '8px' }}>
                   <h2 style={{ margin: '0 0 5px 0', color: '#0066cc' }}>{child.name}</h2>
                   <h3 style={{ margin: 0, fontSize: '24px' }}>{child.points} 🌟</h3>
                   <button 
                     onClick={() => removePoints(child.id)}
-                    style={{ marginTop: '10px', padding: '5px 10px', background: '#ffcccc', color: '#cc0000', border: '1px solid #ff9999', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}
+                    style={{ marginTop: '10px', padding: '5px', background: '#ffcccc', color: '#cc0000', border: '1px solid #ff9999', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', width: '100%' }}
                   >
-                    ➖ Erreur (Retirer des points)
+                    ➖ Retirer des points
                   </button>
                 </div>
 
-                {/* Actions pour gagner des points */}
-                <h4 style={{ color: '#2e8b57', margin: '15px 0 5px 0' }}>✅ Tâches</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {tasks.map(t => (
+                <h4 style={{ color: '#2e8b57', margin: '15px 0 5px 0', fontSize: '14px' }}>✅ Quotidien</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {tasks.filter(t => !t.is_bonus).map(t => (
                     <button 
-                      key={t.id} 
-                      onClick={() => addPoints(child.id, t.value)} 
-                      style={{ padding: '8px', display: 'flex', justifyContent: 'space-between', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                      key={t.id} onClick={() => addPoints(child.id, t.value)} 
+                      style={{ padding: '6px', display: 'flex', justifyContent: 'space-between', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
                     >
                       <span title={t.title}>{t.icon}</span> <strong>+{t.value}</strong>
                     </button>
                   ))}
                 </div>
 
-                {/* Actions pour dépenser des points */}
-                <h4 style={{ color: '#cd5c5c', margin: '20px 0 5px 0' }}>🎁 Récompenses</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <h4 style={{ color: '#d2691e', margin: '15px 0 5px 0', fontSize: '14px' }}>⭐ Tâches Bonus</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {tasks.filter(t => t.is_bonus).map(t => (
+                    <button 
+                      key={t.id} onClick={() => addPoints(child.id, t.value)} 
+                      style={{ padding: '6px', display: 'flex', justifyContent: 'space-between', background: '#fffacd', border: '1px solid #ffd700', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                    >
+                      <span title={t.title}>{t.icon}</span> <strong style={{ color: '#b8860b' }}>+{t.value}</strong>
+                    </button>
+                  ))}
+                </div>
+
+                <h4 style={{ color: '#cd5c5c', margin: '20px 0 5px 0', fontSize: '14px' }}>🎁 Récompenses</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {rewards.map(r => (
                     <button 
-                      key={r.id} 
-                      onClick={() => redeemReward(child.id, r.value)} 
-                      style={{ padding: '8px', display: 'flex', justifyContent: 'space-between', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                      key={r.id} onClick={() => redeemReward(child.id, r.value)} 
+                      style={{ padding: '6px', display: 'flex', justifyContent: 'space-between', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
                     >
                       <span title={r.title}>{r.icon}</span> <strong>-{r.value}</strong>
                     </button>
