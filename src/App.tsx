@@ -93,7 +93,7 @@ export default function App() {
       setAppMode('READONLY'); // Verrouiller si on re-clique dessus
     } else {
       const password = prompt("Mot de passe Parent :");
-      if (password === "0133") {
+      if (password === "0005") {
         setAppMode(targetMode);
       } else if (password !== null) {
         alert("Mot de passe incorrect ❌");
