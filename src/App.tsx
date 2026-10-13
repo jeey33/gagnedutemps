@@ -5,7 +5,7 @@ interface Item { id: string; title: string; value: number; icon: string; is_bonu
 
 // === CONFIGURATION SUPABASE ===
 const SUPABASE_URL = 'https://nzoysgkqelpayfxwbmbd.supabase.co/rest/v1';
-const SUPABASE_KEY = 'VOTRE_CLE_SECRETE_ICI'; // <-- REMETTEZ VOTRE CLÉ ICI !
+const SUPABASE_KEY = 'sb_publishable_cS53pYq9msZ6FxVcUIuGdA_B5AEud7n'; // <-- REMETTEZ VOTRE CLÉ ICI !
 
 const headers = {
   'apikey': SUPABASE_KEY,
