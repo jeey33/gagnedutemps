@@ -14,11 +14,22 @@ const headers = {
   'Prefer': 'return=representation'
 };
 
+// Liste des icônes rapides à choisir
+const PRESET_ICONS = [
+  '🧹', '🧼', '🍽️', '🧺', '🪥', '🚿', 
+  '📚', '⏰', '💊', '🎒', '📞', '🥖', 
+  '📺', '🎮', '⚽', '🪙', '🍕', '🎁'
+];
+
 export default function App() {
   const [children, setChildren] = useState<Child[]>([]);
   const [tasks, setTasks] = useState<Item[]>([]);
   const [rewards, setRewards] = useState<Item[]>([]);
   const [isAdminMode, setIsAdminMode] = useState(false);
+
+  // États pour les icônes sélectionnées dans le formulaire Parent
+  const [selectedTaskIcon, setSelectedTaskIcon] = useState('🧹');
+  const [selectedRewardIcon, setSelectedRewardIcon] = useState('🎁');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -97,7 +108,7 @@ export default function App() {
     const isBonus = formData.get('is_bonus') === 'on';
     const newItem = {
       id: Date.now().toString(),
-      icon: formData.get('icon') as string,
+      icon: selectedTaskIcon,
       title: formData.get('title') as string,
       value: parseInt(formData.get('value') as string),
       is_bonus: isBonus
@@ -112,7 +123,7 @@ export default function App() {
     const formData = new FormData(e.currentTarget);
     const newItem = {
       id: Date.now().toString(),
-      icon: formData.get('icon') as string,
+      icon: selectedRewardIcon,
       title: formData.get('title') as string,
       value: parseInt(formData.get('value') as string)
     };
@@ -131,15 +142,15 @@ export default function App() {
   };
   const deleteReward = async (id: string) => {
     setRewards(rewards.filter(r => r.id !== id));
-    await fetch(`${SUPABASE_URL}/rewards?id=eq.${id}`, { method: 'DELETE', headers });
+    await fetch(`${SUPABASE_URL}/rewards?id=eq.${r.id}`, { method: 'DELETE', headers });
   };
 
   return (
-    <div style={{ padding: '15px', maxWidth: '800px', margin: '0 auto', fontFamily: 'system-ui' }}>
+    <div style={{ padding: '10px', maxWidth: '900px', margin: '0 auto', fontFamily: 'system-ui' }}>
       
       <button 
         onClick={toggleAdminMode}
-        style={{ width: '100%', padding: '10px', background: isAdminMode ? '#333' : '#eee', color: isAdminMode ? '#fff' : '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', marginBottom: '20px' }}
+        style={{ width: '100%', padding: '10px', background: isAdminMode ? '#333' : '#eee', color: isAdminMode ? '#fff' : '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', marginBottom: '15px' }}
       >
         {isAdminMode ? '🔓 Quitter le mode Parent' : '🔒 Mode Parent (Configuration)'}
       </button>
@@ -148,6 +159,7 @@ export default function App() {
         <div style={{ background: '#f9f9f9', padding: '20px', borderRadius: '8px' }}>
           <h2>Configuration (Protégée)</h2>
           
+          {/* GESTION ENFANTS */}
           <div style={{ marginBottom: '30px' }}>
             <h3>👶 Enfants <button onClick={addChild} style={{ padding: '5px' }}>+ Ajouter</button></h3>
             {children.map(c => (
@@ -158,17 +170,40 @@ export default function App() {
             ))}
           </div>
 
+          {/* GESTION TÂCHES */}
           <div style={{ marginBottom: '30px' }}>
             <h3>✅ Tâches & Bonus</h3>
+            
+            {/* Choisir une icône facilement */}
+            <div style={{ marginBottom: '8px', fontSize: '13px' }}>
+              <strong>1. Choisissez une icône :</strong> {selectedTaskIcon}
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
+                {PRESET_ICONS.map(icon => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setSelectedTaskIcon(icon)}
+                    style={{
+                      padding: '6px', fontSize: '16px', borderRadius: '4px', cursor: 'pointer',
+                      border: selectedTaskIcon === icon ? '2px solid #0066cc' : '1px solid #ccc',
+                      background: selectedTaskIcon === icon ? '#e6f2ff' : '#fff'
+                    }}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <form onSubmit={addTask} style={{ display: 'flex', gap: '5px', marginBottom: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <input name="icon" placeholder="Emoji 🧹" required style={{ width: '60px', padding: '5px' }} />
-              <input name="title" placeholder="Nom de la tâche" required style={{ flex: 1, minWidth: '150px', padding: '5px' }} />
-              <input name="value" type="number" placeholder="Points" required style={{ width: '70px', padding: '5px' }} />
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', background: '#ffe4b5', padding: '4px 8px', borderRadius: '4px' }}>
+              <input name="title" placeholder="Nom de la tâche" required style={{ flex: 1, minWidth: '150px', padding: '6px' }} />
+              <input name="value" type="number" placeholder="Points" required style={{ width: '70px', padding: '6px' }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', background: '#ffe4b5', padding: '5px 8px', borderRadius: '4px' }}>
                 <input type="checkbox" name="is_bonus" /> ⭐ Bonus
               </label>
-              <button type="submit" style={{ padding: '5px 10px', background: '#2e8b57', color: 'white', border: 'none', borderRadius: '4px' }}>Ajouter</button>
+              <button type="submit" style={{ padding: '6px 12px', background: '#2e8b57', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Ajouter</button>
             </form>
+
             {tasks.map(t => (
               <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #ddd', background: t.is_bonus ? '#fffacd' : 'transparent' }}>
                 <span>{t.icon} {t.title} (+{t.value}) {t.is_bonus && '⭐'}</span>
@@ -177,14 +212,36 @@ export default function App() {
             ))}
           </div>
 
+          {/* GESTION RÉCOMPENSES */}
           <div>
             <h3>🎁 Récompenses</h3>
+
+            <div style={{ marginBottom: '8px', fontSize: '13px' }}>
+              <strong>1. Choisissez une icône :</strong> {selectedRewardIcon}
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
+                {PRESET_ICONS.map(icon => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setSelectedRewardIcon(icon)}
+                    style={{
+                      padding: '6px', fontSize: '16px', borderRadius: '4px', cursor: 'pointer',
+                      border: selectedRewardIcon === icon ? '2px solid #cd5c5c' : '1px solid #ccc',
+                      background: selectedRewardIcon === icon ? '#ffe6e6' : '#fff'
+                    }}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <form onSubmit={addReward} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-              <input name="icon" placeholder="Emoji 📺" required style={{ width: '60px', padding: '5px' }} />
-              <input name="title" placeholder="Nom de la récompense" required style={{ flex: 1, padding: '5px' }} />
-              <input name="value" type="number" placeholder="Coût" required style={{ width: '70px', padding: '5px' }} />
-              <button type="submit" style={{ padding: '5px 10px', background: '#cd5c5c', color: 'white', border: 'none', borderRadius: '4px' }}>Ajouter</button>
+              <input name="title" placeholder="Nom de la récompense" required style={{ flex: 1, padding: '6px' }} />
+              <input name="value" type="number" placeholder="Coût" required style={{ width: '70px', padding: '6px' }} />
+              <button type="submit" style={{ padding: '6px 12px', background: '#cd5c5c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Ajouter</button>
             </form>
+
             {rewards.map(r => (
               <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #ddd' }}>
                 <span>{r.icon} {r.title} (-{r.value})</span>
@@ -197,55 +254,62 @@ export default function App() {
       
       (
         <div>
-          <h1 style={{ textAlign: 'center', marginBottom: '20px' }}>🏆 Les Scores</h1>
+          <h1 style={{ textAlign: 'center', margin: '0 0 15px 0' }}>🏆 Tableau des Enfants</h1>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {children.map(child => (
               <div key={child.id} style={{ background: '#f0f8ff', padding: '10px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                 
-                <div style={{ textAlign: 'center', marginBottom: '15px', background: '#fff', padding: '10px', borderRadius: '8px' }}>
-                  <h2 style={{ margin: '0 0 5px 0', color: '#0066cc' }}>{child.name}</h2>
-                  <h3 style={{ margin: 0, fontSize: '24px' }}>{child.points} 🌟</h3>
+                {/* En-tête Enfant */}
+                <div style={{ textAlign: 'center', marginBottom: '10px', background: '#fff', padding: '8px', borderRadius: '8px' }}>
+                  <h2 style={{ margin: '0 0 2px 0', color: '#0066cc', fontSize: '18px' }}>{child.name}</h2>
+                  <h3 style={{ margin: 0, fontSize: '22px' }}>{child.points} 🌟</h3>
                   <button 
                     onClick={() => removePoints(child.id)}
-                    style={{ marginTop: '10px', padding: '5px', background: '#ffcccc', color: '#cc0000', border: '1px solid #ff9999', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', width: '100%' }}
+                    style={{ marginTop: '6px', padding: '4px', background: '#ffcccc', color: '#cc0000', border: '1px solid #ff9999', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', width: '100%' }}
                   >
                     ➖ Retirer des points
                   </button>
                 </div>
 
-                <h4 style={{ color: '#2e8b57', margin: '15px 0 5px 0', fontSize: '14px' }}>✅ Quotidien</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {/* Tâches quotidiennes */}
+                <h4 style={{ color: '#2e8b57', margin: '10px 0 5px 0', fontSize: '13px' }}>✅ Quotidien</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {tasks.filter(t => !t.is_bonus).map(t => (
                     <button 
                       key={t.id} onClick={() => addPoints(child.id, t.value)} 
-                      style={{ padding: '6px', display: 'flex', justifyContent: 'space-between', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                      style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}
                     >
-                      <span title={t.title}>{t.icon}</span> <strong>+{t.value}</strong>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '4px' }}>{t.icon} {t.title}</span> 
+                      <strong style={{ color: '#006400' }}>+{t.value}</strong>
                     </button>
                   ))}
                 </div>
 
-                <h4 style={{ color: '#d2691e', margin: '15px 0 5px 0', fontSize: '14px' }}>⭐ Tâches Bonus</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {/* Tâches Bonus */}
+                <h4 style={{ color: '#d2691e', margin: '15px 0 5px 0', fontSize: '13px' }}>⭐ Missions Bonus</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {tasks.filter(t => t.is_bonus).map(t => (
                     <button 
                       key={t.id} onClick={() => addPoints(child.id, t.value)} 
-                      style={{ padding: '6px', display: 'flex', justifyContent: 'space-between', background: '#fffacd', border: '1px solid #ffd700', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                      style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffacd', border: '1px solid #ffd700', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}
                     >
-                      <span title={t.title}>{t.icon}</span> <strong style={{ color: '#b8860b' }}>+{t.value}</strong>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '4px' }}>{t.icon} {t.title}</span> 
+                      <strong style={{ color: '#b8860b' }}>+{t.value}</strong>
                     </button>
                   ))}
                 </div>
 
-                <h4 style={{ color: '#cd5c5c', margin: '20px 0 5px 0', fontSize: '14px' }}>🎁 Récompenses</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {/* Récompenses */}
+                <h4 style={{ color: '#cd5c5c', margin: '15px 0 5px 0', fontSize: '13px' }}>🎁 Récompenses</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {rewards.map(r => (
                     <button 
                       key={r.id} onClick={() => redeemReward(child.id, r.value)} 
-                      style={{ padding: '6px', display: 'flex', justifyContent: 'space-between', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                      style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}
                     >
-                      <span title={r.title}>{r.icon}</span> <strong>-{r.value}</strong>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '4px' }}>{r.icon} {r.title}</span> 
+                      <strong style={{ color: '#8b0000' }}>-{r.value}</strong>
                     </button>
                   ))}
                 </div>
