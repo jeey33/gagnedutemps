@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Child { id: string; name: string; points: number; }
 interface Item { id: string; title: string; value: number; icon: string; }
 
 // === CONFIGURATION SUPABASE ===
 const SUPABASE_URL = 'https://nzoysgkqelpayfxwbmbd.supabase.co/rest/v1';
-const SUPABASE_KEY = 'sb_publishable_cS53pYq9msZ6FxVcUIuGdA_B5AEud7n'; // <-- COLLEX VOTRE CLÉ ICI
+const SUPABASE_KEY = 'sb_publishable_cS53pYq9msZ6FxVcUIuGdA_B5AEud7n'; // <-- REMETTEZ VOTRE CLÉ ICI !
 
 const headers = {
   'apikey': SUPABASE_KEY,
@@ -18,38 +18,30 @@ export default function App() {
   const [children, setChildren] = useState<Child[]>([]);
   const [tasks, setTasks] = useState<Item[]>([]);
   const [rewards, setRewards] = useState<Item[]>([]);
-  
-  const [selectedChild, setSelectedChild] = useState<string>('');
   const [isAdminMode, setIsAdminMode] = useState(false);
 
-  // 1. CHARGEMENT DES DONNÉES DEPUIS SUPABASE AU DÉMARRAGE
+  // 1. CHARGEMENT DES DONNÉES
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const resChildren = await fetch(`${SUPABASE_URL}/children`, { headers });
-        const resTasks = await fetch(`${SUPABASE_URL}/tasks`, { headers });
-        const resRewards = await fetch(`${SUPABASE_URL}/rewards`, { headers });
-        
-        if (resChildren.ok) {
-          const data = await resChildren.json();
-          setChildren(data);
-          if (data.length > 0) setSelectedChild(data[0].id);
-        }
+        const [resChildren, resTasks, resRewards] = await Promise.all([
+          fetch(`${SUPABASE_URL}/children`, { headers }),
+          fetch(`${SUPABASE_URL}/tasks`, { headers }),
+          fetch(`${SUPABASE_URL}/rewards`, { headers })
+        ]);
+        if (resChildren.ok) setChildren(await resChildren.json());
         if (resTasks.ok) setTasks(await resTasks.json());
         if (resRewards.ok) setRewards(await resRewards.json());
       } catch (error) {
-        console.error("Erreur de connexion à la base de données", error);
+        console.error("Erreur de connexion", error);
       }
     };
     fetchData();
   }, []);
 
-  // 2. MISE À JOUR DES POINTS DANS LA BASE DE DONNÉES
+  // 2. MODIFICATION DES POINTS
   const updatePoints = async (childId: string, newPoints: number) => {
-    // Mise à jour immédiate sur l'écran
     setChildren(children.map(c => c.id === childId ? { ...c, points: newPoints } : c));
-    
-    // Envoi à Supabase
     await fetch(`${SUPABASE_URL}/children?id=eq.${childId}`, {
       method: 'PATCH',
       headers,
@@ -57,51 +49,78 @@ export default function App() {
     });
   };
 
-  const addPoints = (points: number) => {
-    const child = children.find(c => c.id === selectedChild);
-    if (child) updatePoints(child.id, child.points + points);
+  const addPoints = (childId: string, points: number) => {
+    const child = children.find(c => c.id === childId);
+    if (child) updatePoints(childId, child.points + points);
   };
 
-  const redeemReward = (cost: number) => {
-    const child = children.find(c => c.id === selectedChild);
-    if (child && child.points >= cost) {
-      if (window.confirm(`Dépenser ${cost} points ?`)) {
-        updatePoints(child.id, child.points - cost);
+  const removePoints = (childId: string) => {
+    const child = children.find(c => c.id === childId);
+    if (child) {
+      const penalty = prompt(`Combien de points voulez-vous retirer à ${child.name} pour cette erreur ? (ex: 5)`);
+      if (penalty && !isNaN(parseInt(penalty))) {
+        updatePoints(childId, child.points - parseInt(penalty));
       }
-    } else {
-      alert('Pas assez de points !');
     }
   };
 
-  // 3. FONCTIONS DE CONFIGURATION (MODE PARENT)
+  const redeemReward = (childId: string, cost: number) => {
+    const child = children.find(c => c.id === childId);
+    if (child && child.points >= cost) {
+      if (window.confirm(`Dépenser ${cost} points pour ${child.name} ?`)) {
+        updatePoints(childId, child.points - cost);
+      }
+    } else {
+      alert("Pas assez de points ! ❌");
+    }
+  };
+
+  // 3. SÉCURITÉ PARENT
+  const toggleAdminMode = () => {
+    if (!isAdminMode) {
+      const password = prompt("Mot de passe Parent :");
+      if (password === "0133") setIsAdminMode(true);
+      else alert("Mot de passe incorrect ❌");
+    } else {
+      setIsAdminMode(false);
+    }
+  };
+
+  // 4. MODE PARENT : AJOUTS FACILES AVEC FORMULAIRES
   const addChild = async () => {
-    const name = prompt('Nom de l\'enfant :');
+    const name = prompt("Nom de l'enfant :");
     if (!name) return;
     const newItem = { id: Date.now().toString(), name, points: 0 };
     setChildren([...children, newItem]);
     await fetch(`${SUPABASE_URL}/children`, { method: 'POST', headers, body: JSON.stringify(newItem) });
   };
 
-  const addTask = async () => {
-    const title = prompt('Nom de la tâche (ex: Devoirs) :');
-    const value = parseInt(prompt('Points gagnés :') || '0');
-    const icon = prompt('Emoji (ex: 📚) :') || '⭐';
-    if (title && value) {
-      const newItem = { id: Date.now().toString(), title, value, icon };
-      setTasks([...tasks, newItem]);
-      await fetch(`${SUPABASE_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(newItem) });
-    }
+  const addTask = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newItem = {
+      id: Date.now().toString(),
+      icon: formData.get('icon') as string,
+      title: formData.get('title') as string,
+      value: parseInt(formData.get('value') as string)
+    };
+    setTasks([...tasks, newItem]);
+    await fetch(`${SUPABASE_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(newItem) });
+    e.currentTarget.reset();
   };
 
-  const addReward = async () => {
-    const title = prompt('Nom de la récompense :');
-    const value = parseInt(prompt('Coût en points :') || '0');
-    const icon = prompt('Emoji (ex: 🎁) :') || '🎁';
-    if (title && value) {
-      const newItem = { id: Date.now().toString(), title, value, icon };
-      setRewards([...rewards, newItem]);
-      await fetch(`${SUPABASE_URL}/rewards`, { method: 'POST', headers, body: JSON.stringify(newItem) });
-    }
+  const addReward = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newItem = {
+      id: Date.now().toString(),
+      icon: formData.get('icon') as string,
+      title: formData.get('title') as string,
+      value: parseInt(formData.get('value') as string)
+    };
+    setRewards([...rewards, newItem]);
+    await fetch(`${SUPABASE_URL}/rewards`, { method: 'POST', headers, body: JSON.stringify(newItem) });
+    e.currentTarget.reset();
   };
 
   const deleteChild = async (id: string) => {
@@ -117,13 +136,11 @@ export default function App() {
     await fetch(`${SUPABASE_URL}/rewards?id=eq.${id}`, { method: 'DELETE', headers });
   };
 
-  const currentChild = children.find(c => c.id === selectedChild);
-
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', fontFamily: 'system-ui' }}>
+    <div style={{ padding: '15px', maxWidth: '800px', margin: '0 auto', fontFamily: 'system-ui' }}>
       
       <button 
-        onClick={() => setIsAdminMode(!isAdminMode)}
+        onClick={toggleAdminMode}
         style={{ width: '100%', padding: '10px', background: isAdminMode ? '#333' : '#eee', color: isAdminMode ? '#fff' : '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', marginBottom: '20px' }}
       >
         {isAdminMode ? '🔓 Quitter le mode Parent' : '🔒 Mode Parent (Configuration)'}
@@ -131,77 +148,108 @@ export default function App() {
 
       {isAdminMode ? (
         <div style={{ background: '#f9f9f9', padding: '20px', borderRadius: '8px' }}>
-          <h2>Configuration (Synchronisé)</h2>
+          <h2>Configuration (Protégée)</h2>
           
-          <div style={{ marginBottom: '20px' }}>
+          {/* GESTION DES ENFANTS */}
+          <div style={{ marginBottom: '30px' }}>
             <h3>👶 Enfants <button onClick={addChild} style={{ padding: '5px' }}>+ Ajouter</button></h3>
             {children.map(c => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #ddd' }}>
                 <span>{c.name} ({c.points} pts)</span>
                 <button onClick={() => deleteChild(c.id)}>❌</button>
               </div>
             ))}
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <h3>✅ Tâches <button onClick={addTask} style={{ padding: '5px' }}>+ Ajouter</button></h3>
+          {/* GESTION DES TÂCHES */}
+          <div style={{ marginBottom: '30px' }}>
+            <h3>✅ Tâches (Actions positives)</h3>
+            <form onSubmit={addTask} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+              <input name="icon" placeholder="Emoji 🧹" required style={{ width: '60px', padding: '5px' }} />
+              <input name="title" placeholder="Nom de la tâche" required style={{ flex: 1, padding: '5px' }} />
+              <input name="value" type="number" placeholder="Points" required style={{ width: '70px', padding: '5px' }} />
+              <button type="submit" style={{ padding: '5px 10px', background: '#2e8b57', color: 'white', border: 'none', borderRadius: '4px' }}>Ajouter</button>
+            </form>
             {tasks.map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
-                <span>{t.icon} {t.title} (+{t.value} pts)</span>
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #ddd' }}>
+                <span>{t.icon} {t.title} (+{t.value})</span>
                 <button onClick={() => deleteTask(t.id)}>❌</button>
               </div>
             ))}
           </div>
 
+          {/* GESTION DES RÉCOMPENSES */}
           <div>
-            <h3>🎁 Récompenses <button onClick={addReward} style={{ padding: '5px' }}>+ Ajouter</button></h3>
+            <h3>🎁 Récompenses</h3>
+            <form onSubmit={addReward} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+              <input name="icon" placeholder="Emoji 📺" required style={{ width: '60px', padding: '5px' }} />
+              <input name="title" placeholder="Nom de la récompense" required style={{ flex: 1, padding: '5px' }} />
+              <input name="value" type="number" placeholder="Coût" required style={{ width: '70px', padding: '5px' }} />
+              <button type="submit" style={{ padding: '5px 10px', background: '#cd5c5c', color: 'white', border: 'none', borderRadius: '4px' }}>Ajouter</button>
+            </form>
             {rewards.map(r => (
-              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
-                <span>{r.icon} {r.title} (-{r.value} pts)</span>
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #ddd' }}>
+                <span>{r.icon} {r.title} (-{r.value})</span>
                 <button onClick={() => deleteReward(r.id)}>❌</button>
               </div>
             ))}
           </div>
         </div>
       ) : 
+      
+      /* === ÉCRAN SCINDÉ EN 2 COLONNES POUR LES ENFANTS === */
       (
-        <>
-          <h1 style={{ textAlign: 'center' }}>🏆 Mes Points</h1>
+        <div>
+          <h1 style={{ textAlign: 'center', marginBottom: '20px' }}>🏆 Les Scores</h1>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            {children.map(child => (
+              <div key={child.id} style={{ background: '#f0f8ff', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                
+                {/* En-tête de l'enfant */}
+                <div style={{ textAlign: 'center', marginBottom: '15px', background: '#fff', padding: '10px', borderRadius: '8px' }}>
+                  <h2 style={{ margin: '0 0 5px 0', color: '#0066cc' }}>{child.name}</h2>
+                  <h3 style={{ margin: 0, fontSize: '24px' }}>{child.points} 🌟</h3>
+                  <button 
+                    onClick={() => removePoints(child.id)}
+                    style={{ marginTop: '10px', padding: '5px 10px', background: '#ffcccc', color: '#cc0000', border: '1px solid #ff9999', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    ➖ Erreur (Retirer des points)
+                  </button>
+                </div>
 
-          {children.length > 0 && (
-            <select
-              value={selectedChild}
-              onChange={(e) => setSelectedChild(e.target.value)}
-              style={{ width: '100%', padding: '10px', fontSize: '18px', marginBottom: '20px' }}
-            >
-              {children.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          )}
+                {/* Actions pour gagner des points */}
+                <h4 style={{ color: '#2e8b57', margin: '15px 0 5px 0' }}>✅ Tâches</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {tasks.map(t => (
+                    <button 
+                      key={t.id} 
+                      onClick={() => addPoints(child.id, t.value)} 
+                      style={{ padding: '8px', display: 'flex', justifyContent: 'space-between', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                    >
+                      <span title={t.title}>{t.icon}</span> <strong>+{t.value}</strong>
+                    </button>
+                  ))}
+                </div>
 
-          {currentChild && (
-            <div style={{ background: '#e6f7ff', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>{currentChild.name} a {currentChild.points} points 🌟</h2>
-            </div>
-          )}
+                {/* Actions pour dépenser des points */}
+                <h4 style={{ color: '#cd5c5c', margin: '20px 0 5px 0' }}>🎁 Récompenses</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {rewards.map(r => (
+                    <button 
+                      key={r.id} 
+                      onClick={() => redeemReward(child.id, r.value)} 
+                      style={{ padding: '8px', display: 'flex', justifyContent: 'space-between', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}
+                    >
+                      <span title={r.title}>{r.icon}</span> <strong>-{r.value}</strong>
+                    </button>
+                  ))}
+                </div>
 
-          <h3 style={{ color: '#2e8b57' }}>Gagner des points</h3>
-          <div style={{ display: 'grid', gap: '10px', marginBottom: '30px' }}>
-            {tasks.map(t => (
-              <button key={t.id} onClick={() => addPoints(t.value)} style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '8px', fontSize: '16px', cursor: 'pointer' }}>
-                <span>{t.icon} {t.title}</span> <strong>+{t.value}</strong>
-              </button>
+              </div>
             ))}
           </div>
-
-          <h3 style={{ color: '#cd5c5c' }}>Dépenser des points</h3>
-          <div style={{ display: 'grid', gap: '10px' }}>
-            {rewards.map(r => (
-              <button key={r.id} onClick={() => redeemReward(r.value)} style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '8px', fontSize: '16px', cursor: 'pointer' }}>
-                <span>{r.icon} {r.title}</span> <strong>-{r.value}</strong>
-              </button>
-            ))}
-          </div>
-        </>
+        </div>
       )}
     </div>
   );
