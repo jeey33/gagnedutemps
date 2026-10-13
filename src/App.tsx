@@ -14,7 +14,6 @@ const headers = {
   'Prefer': 'return=representation'
 };
 
-// Liste des icônes rapides à choisir
 const PRESET_ICONS = [
   '🧹', '🧼', '🍽️', '🧺', '🪥', '🚿', 
   '📚', '⏰', '💊', '🎒', '📞', '🥖', 
@@ -25,9 +24,10 @@ export default function App() {
   const [children, setChildren] = useState<Child[]>([]);
   const [tasks, setTasks] = useState<Item[]>([]);
   const [rewards, setRewards] = useState<Item[]>([]);
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  
+  // Modes : 'READONLY' (enfants), 'POINTS' (ajout/retrait points), 'CONFIG' (gestion tâches)
+  const [appMode, setAppMode] = useState<'READONLY' | 'POINTS' | 'CONFIG'>('READONLY');
 
-  // États pour les icônes sélectionnées dans le formulaire Parent
   const [selectedTaskIcon, setSelectedTaskIcon] = useState('🧹');
   const [selectedRewardIcon, setSelectedRewardIcon] = useState('🎁');
 
@@ -59,11 +59,13 @@ export default function App() {
   };
 
   const addPoints = (childId: string, points: number) => {
+    if (appMode !== 'POINTS') return;
     const child = children.find(c => c.id === childId);
     if (child) updatePoints(childId, child.points + points);
   };
 
   const removePoints = (childId: string) => {
+    if (appMode !== 'POINTS') return;
     const child = children.find(c => c.id === childId);
     if (child) {
       const penalty = prompt(`Combien de points retirer à ${child.name} pour cette erreur ? (ex: 5)`);
@@ -74,6 +76,7 @@ export default function App() {
   };
 
   const redeemReward = (childId: string, cost: number) => {
+    if (appMode !== 'POINTS') return;
     const child = children.find(c => c.id === childId);
     if (child && child.points >= cost) {
       if (window.confirm(`Dépenser ${cost} points pour ${child.name} ?`)) {
@@ -84,13 +87,17 @@ export default function App() {
     }
   };
 
-  const toggleAdminMode = () => {
-    if (!isAdminMode) {
-      const password = prompt("Mot de passe Parent :");
-      if (password === "0133") setIsAdminMode(true);
-      else alert("Mot de passe incorrect ❌");
+  // VÉRIFICATION DE SÉCURITÉ MOT DE PASSE PARENT
+  const requestParentAccess = (targetMode: 'POINTS' | 'CONFIG') => {
+    if (appMode === targetMode) {
+      setAppMode('READONLY'); // Verrouiller si on re-clique dessus
     } else {
-      setIsAdminMode(false);
+      const password = prompt("Mot de passe Parent :");
+      if (password === "0133") {
+        setAppMode(targetMode);
+      } else if (password !== null) {
+        alert("Mot de passe incorrect ❌");
+      }
     }
   };
 
@@ -148,18 +155,45 @@ export default function App() {
   return (
     <div style={{ padding: '10px', maxWidth: '900px', margin: '0 auto', fontFamily: 'system-ui' }}>
       
-      <button 
-        onClick={toggleAdminMode}
-        style={{ width: '100%', padding: '10px', background: isAdminMode ? '#333' : '#eee', color: isAdminMode ? '#fff' : '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', marginBottom: '15px' }}
-      >
-        {isAdminMode ? '🔓 Quitter le mode Parent' : '🔒 Mode Parent (Configuration)'}
-      </button>
+      {/* BARRE DE BOUTONS PARENT */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
+        <button 
+          onClick={() => requestParentAccess('POINTS')}
+          style={{ 
+            flex: 1, padding: '10px 5px', fontSize: '13px', fontWeight: 'bold',
+            background: appMode === 'POINTS' ? '#2e8b57' : '#e6ffe6', 
+            color: appMode === 'POINTS' ? '#fff' : '#2e8b57', 
+            border: '1px solid #2e8b57', borderRadius: '8px', cursor: 'pointer' 
+          }}
+        >
+          {appMode === 'POINTS' ? '🔓 Mode Points (Actif)' : '🔒 Mode Parent (Ajout Points)'}
+        </button>
 
-      {isAdminMode ? (
+        <button 
+          onClick={() => requestParentAccess('CONFIG')}
+          style={{ 
+            flex: 1, padding: '10px 5px', fontSize: '13px', fontWeight: 'bold',
+            background: appMode === 'CONFIG' ? '#333' : '#eee', 
+            color: appMode === 'CONFIG' ? '#fff' : '#333', 
+            border: '1px solid #333', borderRadius: '8px', cursor: 'pointer' 
+          }}
+        >
+          {appMode === 'CONFIG' ? '🔓 Mode Config (Actif)' : '🔒 Mode Parent (Configuration)'}
+        </button>
+      </div>
+
+      {/* BANDEAU INDICATEUR SI LECTURE SEULE */}
+      {appMode === 'READONLY' && (
+        <div style={{ textAlign: 'center', background: '#fff3cd', color: '#856404', padding: '6px', borderRadius: '6px', marginBottom: '15px', fontSize: '12px' }}>
+          👀 <strong>Mode Enfants (Lecture seule)</strong> — Cliquez sur un bouton Parent ci-dessus pour modifier.
+        </div>
+      )}
+
+      {/* MODE CONFIGURATION */}
+      {appMode === 'CONFIG' ? (
         <div style={{ background: '#f9f9f9', padding: '20px', borderRadius: '8px' }}>
-          <h2>Configuration (Protégée)</h2>
+          <h2>Configuration (Protégée par code)</h2>
           
-          {/* GESTION ENFANTS */}
           <div style={{ marginBottom: '30px' }}>
             <h3>👶 Enfants <button onClick={addChild} style={{ padding: '5px' }}>+ Ajouter</button></h3>
             {children.map(c => (
@@ -170,19 +204,14 @@ export default function App() {
             ))}
           </div>
 
-          {/* GESTION TÂCHES */}
           <div style={{ marginBottom: '30px' }}>
             <h3>✅ Tâches & Bonus</h3>
-            
-            {/* Choisir une icône facilement */}
             <div style={{ marginBottom: '8px', fontSize: '13px' }}>
               <strong>1. Choisissez une icône :</strong> {selectedTaskIcon}
               <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
                 {PRESET_ICONS.map(icon => (
                   <button
-                    key={icon}
-                    type="button"
-                    onClick={() => setSelectedTaskIcon(icon)}
+                    key={icon} type="button" onClick={() => setSelectedTaskIcon(icon)}
                     style={{
                       padding: '6px', fontSize: '16px', borderRadius: '4px', cursor: 'pointer',
                       border: selectedTaskIcon === icon ? '2px solid #0066cc' : '1px solid #ccc',
@@ -212,18 +241,14 @@ export default function App() {
             ))}
           </div>
 
-          {/* GESTION RÉCOMPENSES */}
           <div>
             <h3>🎁 Récompenses</h3>
-
             <div style={{ marginBottom: '8px', fontSize: '13px' }}>
               <strong>1. Choisissez une icône :</strong> {selectedRewardIcon}
               <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
                 {PRESET_ICONS.map(icon => (
                   <button
-                    key={icon}
-                    type="button"
-                    onClick={() => setSelectedRewardIcon(icon)}
+                    key={icon} type="button" onClick={() => setSelectedRewardIcon(icon)}
                     style={{
                       padding: '6px', fontSize: '16px', borderRadius: '4px', cursor: 'pointer',
                       border: selectedRewardIcon === icon ? '2px solid #cd5c5c' : '1px solid #ccc',
@@ -252,6 +277,7 @@ export default function App() {
         </div>
       ) : 
       
+      /* ÉCRAN PRINCIPAL DES ENFANTS (Readonly ou Ajout de Points) */
       (
         <div>
           <h1 style={{ textAlign: 'center', margin: '0 0 15px 0' }}>🏆 Tableau des Enfants</h1>
@@ -264,12 +290,15 @@ export default function App() {
                 <div style={{ textAlign: 'center', marginBottom: '10px', background: '#fff', padding: '8px', borderRadius: '8px' }}>
                   <h2 style={{ margin: '0 0 2px 0', color: '#0066cc', fontSize: '18px' }}>{child.name}</h2>
                   <h3 style={{ margin: 0, fontSize: '22px' }}>{child.points} 🌟</h3>
-                  <button 
-                    onClick={() => removePoints(child.id)}
-                    style={{ marginTop: '6px', padding: '4px', background: '#ffcccc', color: '#cc0000', border: '1px solid #ff9999', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', width: '100%' }}
-                  >
-                    ➖ Retirer des points
-                  </button>
+                  
+                  {appMode === 'POINTS' && (
+                    <button 
+                      onClick={() => removePoints(child.id)}
+                      style={{ marginTop: '6px', padding: '4px', background: '#ffcccc', color: '#cc0000', border: '1px solid #ff9999', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', width: '100%' }}
+                    >
+                      ➖ Retirer des points
+                    </button>
+                  )}
                 </div>
 
                 {/* Tâches quotidiennes */}
@@ -277,11 +306,20 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {tasks.filter(t => !t.is_bonus).map(t => (
                     <button 
-                      key={t.id} onClick={() => addPoints(child.id, t.value)} 
-                      style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}
+                      key={t.id} 
+                      onClick={() => addPoints(child.id, t.value)} 
+                      disabled={appMode === 'READONLY'}
+                      style={{ 
+                        padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                        background: appMode === 'READONLY' ? '#f5f5f5' : '#e6ffe6', 
+                        border: appMode === 'READONLY' ? '1px solid #e0e0e0' : '1px solid #b3ffb3', 
+                        borderRadius: '6px', fontSize: '12px', 
+                        cursor: appMode === 'READONLY' ? 'default' : 'pointer', textAlign: 'left',
+                        opacity: appMode === 'READONLY' ? 0.8 : 1
+                      }}
                     >
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '4px' }}>{t.icon} {t.title}</span> 
-                      <strong style={{ color: '#006400' }}>+{t.value}</strong>
+                      <strong style={{ color: appMode === 'READONLY' ? '#666' : '#006400' }}>+{t.value}</strong>
                     </button>
                   ))}
                 </div>
@@ -291,11 +329,20 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {tasks.filter(t => t.is_bonus).map(t => (
                     <button 
-                      key={t.id} onClick={() => addPoints(child.id, t.value)} 
-                      style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffacd', border: '1px solid #ffd700', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}
+                      key={t.id} 
+                      onClick={() => addPoints(child.id, t.value)} 
+                      disabled={appMode === 'READONLY'}
+                      style={{ 
+                        padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                        background: appMode === 'READONLY' ? '#faf0e6' : '#fffacd', 
+                        border: appMode === 'READONLY' ? '1px solid #e0e0e0' : '1px solid #ffd700', 
+                        borderRadius: '6px', fontSize: '12px', 
+                        cursor: appMode === 'READONLY' ? 'default' : 'pointer', textAlign: 'left',
+                        opacity: appMode === 'READONLY' ? 0.8 : 1
+                      }}
                     >
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '4px' }}>{t.icon} {t.title}</span> 
-                      <strong style={{ color: '#b8860b' }}>+{t.value}</strong>
+                      <strong style={{ color: appMode === 'READONLY' ? '#666' : '#b8860b' }}>+{t.value}</strong>
                     </button>
                   ))}
                 </div>
@@ -305,11 +352,20 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {rewards.map(r => (
                     <button 
-                      key={r.id} onClick={() => redeemReward(child.id, r.value)} 
-                      style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}
+                      key={r.id} 
+                      onClick={() => redeemReward(child.id, r.value)} 
+                      disabled={appMode === 'READONLY'}
+                      style={{ 
+                        padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                        background: appMode === 'READONLY' ? '#f5f5f5' : '#fff0f5', 
+                        border: appMode === 'READONLY' ? '1px solid #e0e0e0' : '1px solid #ffb6c1', 
+                        borderRadius: '6px', fontSize: '12px', 
+                        cursor: appMode === 'READONLY' ? 'default' : 'pointer', textAlign: 'left',
+                        opacity: appMode === 'READONLY' ? 0.8 : 1
+                      }}
                     >
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '4px' }}>{r.icon} {r.title}</span> 
-                      <strong style={{ color: '#8b0000' }}>-{r.value}</strong>
+                      <strong style={{ color: appMode === 'READONLY' ? '#666' : '#8b0000' }}>-{r.value}</strong>
                     </button>
                   ))}
                 </div>
