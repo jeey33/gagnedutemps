@@ -1,134 +1,171 @@
 import { useState, useEffect } from 'react';
 
-// Définition des types pour TypeScript
 interface Child {
   id: string;
   name: string;
   points: number;
 }
 
-interface Task {
+interface Item {
   id: string;
   title: string;
-  points: number;
-  icon: string;
-}
-
-interface Reward {
-  id: string;
-  title: string;
-  cost: number;
+  value: number; // points ou cost
   icon: string;
 }
 
 export default function App() {
-  // Chargement des données depuis la mémoire du navigateur ou initialisation par défaut
+  // 1. CHARGEMENT DES DONNÉES SAUVEGARDÉES
   const [children, setChildren] = useState<Child[]>(() => {
-    const saved = localStorage.getItem('childrenData');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Léo', points: 0 },
-      { id: '2', name: 'Mia', points: 0 }
-    ];
+    const saved = localStorage.getItem('appChildren');
+    return saved ? JSON.parse(saved) : [{ id: '1', name: 'Léo', points: 0 }];
   });
 
-  // Liste des tâches configurables
-  const [tasks] = useState<Task[]>([
-    { id: '1', title: 'Ranger sa chambre', points: 10, icon: '🧹' },
-    { id: '2', title: 'Faire ses devoirs', points: 15, icon: '📚' },
-    { id: '3', title: 'Mettre la table', points: 5, icon: '🍽️' },
-    { id: '4', title: 'Se brosser les dents', points: 5, icon: '🪥' }
-  ]);
+  const [tasks, setTasks] = useState<Item[]>(() => {
+    const saved = localStorage.getItem('appTasks');
+    return saved ? JSON.parse(saved) : [{ id: '1', title: 'Ranger sa chambre', value: 10, icon: '🧹' }];
+  });
 
-  // Liste des récompenses configurables
-  const [rewards] = useState<Reward[]>([
-    { id: '1', title: '30 min d\'écran', cost: 50, icon: '📺' },
-    { id: '2', title: 'Activité en famille', cost: 100, icon: '⚽' },
-    { id: '3', title: '2 euros d\'argent de poche', cost: 200, icon: '🪙' }
-  ]);
+  const [rewards, setRewards] = useState<Item[]>(() => {
+    const saved = localStorage.getItem('appRewards');
+    return saved ? JSON.parse(saved) : [{ id: '1', title: '30 min d\'écran', value: 50, icon: '📺' }];
+  });
 
   const [selectedChild, setSelectedChild] = useState<string>(children[0]?.id || '');
+  const [isAdminMode, setIsAdminMode] = useState(false);
 
-  // Sauvegarde automatique à chaque modification des points
-  useEffect(() => {
-    localStorage.setItem('childrenData', JSON.stringify(children));
-  }, [children]);
+  // 2. SAUVEGARDE AUTOMATIQUE À CHAQUE MODIFICATION
+  useEffect(() => localStorage.setItem('appChildren', JSON.stringify(children)), [children]);
+  useEffect(() => localStorage.setItem('appTasks', JSON.stringify(tasks)), [tasks]);
+  useEffect(() => localStorage.setItem('appRewards', JSON.stringify(rewards)), [rewards]);
 
+  // 3. FONCTIONS POUR LES POINTS
   const addPoints = (points: number) => {
-    setChildren(children.map(child =>
-      child.id === selectedChild ? { ...child, points: child.points + points } : child
-    ));
+    setChildren(children.map(c => c.id === selectedChild ? { ...c, points: c.points + points } : c));
   };
 
   const redeemReward = (cost: number) => {
     const child = children.find(c => c.id === selectedChild);
     if (child && child.points >= cost) {
-      if (window.confirm(`Confirmer l'achat de la récompense pour ${cost} points ?`)) {
-        setChildren(children.map(c =>
-          c.id === selectedChild ? { ...c, points: c.points - cost } : c
-        ));
-        alert('Récompense accordée ! 🎉');
+      if (window.confirm(`Dépenser ${cost} points ?`)) {
+        setChildren(children.map(c => c.id === selectedChild ? { ...c, points: c.points - cost } : c));
       }
     } else {
-      alert('Pas assez de points ! ❌');
+      alert('Pas assez de points !');
     }
   };
+
+  // 4. FONCTIONS DE CONFIGURATION (MODE PARENT)
+  const addChild = () => {
+    const name = prompt('Nom de l\'enfant :');
+    if (name) setChildren([...children, { id: Date.now().toString(), name, points: 0 }]);
+  };
+
+  const addTask = () => {
+    const title = prompt('Nom de la tâche (ex: Devoirs) :');
+    const value = parseInt(prompt('Points gagnés :') || '0');
+    const icon = prompt('Emoji (ex: 📚) :') || '⭐';
+    if (title && value) setTasks([...tasks, { id: Date.now().toString(), title, value, icon }]);
+  };
+
+  const addReward = () => {
+    const title = prompt('Nom de la récompense :');
+    const value = parseInt(prompt('Coût en points :') || '0');
+    const icon = prompt('Emoji (ex: 🎁) :') || '🎁';
+    if (title && value) setRewards([...rewards, { id: Date.now().toString(), title, value, icon }]);
+  };
+
+  const deleteChild = (id: string) => setChildren(children.filter(c => c.id !== id));
+  const deleteTask = (id: string) => setTasks(tasks.filter(t => t.id !== id));
+  const deleteReward = (id: string) => setRewards(rewards.filter(r => r.id !== id));
 
   const currentChild = children.find(c => c.id === selectedChild);
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ textAlign: 'center', color: '#333' }}>🏆 Tableau des Récompenses</h1>
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', fontFamily: 'system-ui' }}>
+      
+      {/* BOUTON MODE PARENT / ENFANT */}
+      <button 
+        onClick={() => setIsAdminMode(!isAdminMode)}
+        style={{ width: '100%', padding: '10px', background: isAdminMode ? '#333' : '#eee', color: isAdminMode ? '#fff' : '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', marginBottom: '20px' }}
+      >
+        {isAdminMode ? '🔓 Quitter le mode Parent' : '🔒 Mode Parent (Configuration)'}
+      </button>
 
-      <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <label style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>Sélectionner l'enfant : </label>
-        <select
-          value={selectedChild}
-          onChange={(e) => setSelectedChild(e.target.value)}
-          style={{ padding: '10px', fontSize: '16px', borderRadius: '8px', border: '1px solid #ccc' }}
-        >
-          {children.map(child => (
-            <option key={child.id} value={child.id}>{child.name}</option>
-          ))}
-        </select>
-      </div>
+      {/* ----------- MODE PARENT ----------- */}
+      {isAdminMode ? (
+        <div style={{ background: '#f9f9f9', padding: '20px', borderRadius: '8px' }}>
+          <h2>Configuration</h2>
+          
+          <div style={{ marginBottom: '20px' }}>
+            <h3>👶 Enfants <button onClick={addChild} style={{ padding: '5px' }}>+ Ajouter</button></h3>
+            {children.map(c => (
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                <span>{c.name} ({c.points} pts)</span>
+                <button onClick={() => deleteChild(c.id)}>❌</button>
+              </div>
+            ))}
+          </div>
 
-      {currentChild && (
-        <div style={{ background: '#f0f8ff', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-          <h2 style={{ margin: 0, color: '#0066cc' }}>{currentChild.name} a {currentChild.points} points 🌟</h2>
+          <div style={{ marginBottom: '20px' }}>
+            <h3>✅ Tâches <button onClick={addTask} style={{ padding: '5px' }}>+ Ajouter</button></h3>
+            {tasks.map(t => (
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                <span>{t.icon} {t.title} (+{t.value} pts)</span>
+                <button onClick={() => deleteTask(t.id)}>❌</button>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <h3>🎁 Récompenses <button onClick={addReward} style={{ padding: '5px' }}>+ Ajouter</button></h3>
+            {rewards.map(r => (
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                <span>{r.icon} {r.title} (-{r.value} pts)</span>
+                <button onClick={() => deleteReward(r.id)}>❌</button>
+              </div>
+            ))}
+          </div>
         </div>
+      ) : 
+      
+      /* ----------- MODE ENFANT (UTILISATION) ----------- */
+      (
+        <>
+          <h1 style={{ textAlign: 'center' }}>🏆 Mes Points</h1>
+
+          <select
+            value={selectedChild}
+            onChange={(e) => setSelectedChild(e.target.value)}
+            style={{ width: '100%', padding: '10px', fontSize: '18px', marginBottom: '20px' }}
+          >
+            {children.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+
+          {currentChild && (
+            <div style={{ background: '#e6f7ff', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0 }}>{currentChild.name} a {currentChild.points} points 🌟</h2>
+            </div>
+          )}
+
+          <h3 style={{ color: '#2e8b57' }}>Gagner des points</h3>
+          <div style={{ display: 'grid', gap: '10px', marginBottom: '30px' }}>
+            {tasks.map(t => (
+              <button key={t.id} onClick={() => addPoints(t.value)} style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '8px', fontSize: '16px', cursor: 'pointer' }}>
+                <span>{t.icon} {t.title}</span> <strong>+{t.value}</strong>
+              </button>
+            ))}
+          </div>
+
+          <h3 style={{ color: '#cd5c5c' }}>Dépenser des points</h3>
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {rewards.map(r => (
+              <button key={r.id} onClick={() => redeemReward(r.value)} style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '8px', fontSize: '16px', cursor: 'pointer' }}>
+                <span>{r.icon} {r.title}</span> <strong>-{r.value}</strong>
+              </button>
+            ))}
+          </div>
+        </>
       )}
-
-      <h3 style={{ color: '#2e8b57' }}>✅ Actions (Gagner des points)</h3>
-      <div style={{ display: 'grid', gap: '10px', marginBottom: '30px' }}>
-        {tasks.map(task => (
-          <button
-            key={task.id}
-            onClick={() => addPoints(task.points)}
-            style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6ffe6', border: '1px solid #b3ffb3', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', transition: 'transform 0.1s' }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            <span>{task.icon} {task.title}</span>
-            <span style={{ fontWeight: 'bold', color: '#006400', background: '#ccffcc', padding: '4px 8px', borderRadius: '12px' }}>+ {task.points}</span>
-          </button>
-        ))}
-      </div>
-
-      <h3 style={{ color: '#cd5c5c' }}>🎁 Récompenses (Dépenser des points)</h3>
-      <div style={{ display: 'grid', gap: '10px' }}>
-        {rewards.map(reward => (
-          <button
-            key={reward.id}
-            onClick={() => redeemReward(reward.cost)}
-            style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff0f5', border: '1px solid #ffb6c1', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', transition: 'transform 0.1s' }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            <span>{reward.icon} {reward.title}</span>
-            <span style={{ fontWeight: 'bold', color: '#8b0000', background: '#ffe4e1', padding: '4px 8px', borderRadius: '12px' }}>- {reward.cost}</span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
